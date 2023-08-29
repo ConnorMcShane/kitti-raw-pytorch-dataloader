@@ -16,30 +16,6 @@ loader = train_loader
 means = loader.dataset.cfg["transforms"]["train"]["Normalise"]["mean"]
 stds = loader.dataset.cfg["transforms"]["train"]["Normalise"]["std"]
 
-def load_pointcloud_depthmap(point_cloud: np.ndarray, lidar2cam: np.ndarray, size: np.ndarray, camera: str = "image_02") -> np.ndarray:
-
-    # project lidar points to image
-    point_cloud = point_cloud[:, :3].T
-    point_cloud = np.concatenate([point_cloud, np.ones([1, point_cloud.shape[1]])], axis=0)
-    img_points = lidar2cam @ point_cloud
-    depths = img_points[2]
-    img_points = img_points[:2] / img_points[2]
-    img_points = img_points.T.astype(np.int32)
-
-    # filter points outside image
-    img_size = size
-    mask = np.logical_and(img_points[:, 0] >= 0, img_points[:, 0] < img_size[0])
-    mask = np.logical_and(mask, img_points[:, 1] >= 0)
-    mask = np.logical_and(mask, img_points[:, 1] < img_size[1])
-    img_points = img_points[mask]
-    depths = depths[mask]
-
-    # save depthmap image
-    depthmap = np.zeros([img_size[1], img_size[0]])
-    depthmap[img_points[:, 1], img_points[:, 0]] = depths
-
-    return depthmap
-
 for i, batch in enumerate(loader):
 
     # print all keys and their types and shapes
