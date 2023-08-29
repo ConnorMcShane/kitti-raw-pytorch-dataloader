@@ -2,9 +2,9 @@
 
 import cv2
 import numpy as np
-import copy
 import os
 import open3d as o3d
+import copy
 
 
 class Loaders():
@@ -119,19 +119,23 @@ class Loaders():
         """
         # load point cloud
         point_cloud = self.load_pointcloud(path)
+
+        x_ind = 1
+        y_ind = 0
+        z_ind = 2
         
         # remove points outside of range
-        point_cloud = point_cloud[(point_cloud[:, 0] >= x_range[0]) & (point_cloud[:, 0] <= x_range[1])]
-        point_cloud = point_cloud[(point_cloud[:, 1] >= y_range[0]) & (point_cloud[:, 1] <= y_range[1])]
+        point_cloud = point_cloud[(point_cloud[:, x_ind] >= x_range[0]) & (point_cloud[:, x_ind] <= x_range[1])]
+        point_cloud = point_cloud[(point_cloud[:, y_ind] >= y_range[0]) & (point_cloud[:, y_ind] <= y_range[1])]
 
         # Calculate the step sizes for x and y
         x_step = (x_range[1] - x_range[0]) / width
         y_step = (y_range[1] - y_range[0]) / height
         
         # Calculate the indices for each point's location in the BEV image
-        x_indices = ((point_cloud[:, 0] - x_range[0]) / x_step).astype(int)
-        y_indices = ((point_cloud[:, 1] - y_range[0]) / y_step).astype(int)
-        z_values = point_cloud[:, 2]
+        x_indices = ((point_cloud[:, x_ind] - x_range[0]) / x_step).astype(int)
+        y_indices = ((point_cloud[:, y_ind] - y_range[0]) / y_step).astype(int)
+        z_values = point_cloud[:, z_ind]
         
         # Create an empty BEV image
         bev_image = np.zeros((height, width))
@@ -146,6 +150,12 @@ class Loaders():
         bev_image[bev_image != 0] += (ground_offset / (1 - ground_offset))
         bev_image /= ((ground_offset / (1 - ground_offset)) + 1.0)
         bev_image = np.clip(bev_image, 0, 1)
+
+        # flip vertically to bring front car direction to the top of image 
+        bev_image = np.flipud(bev_image).copy()
+
+        # flip horizontally to bring left car direction to the left of image
+        bev_image = np.fliplr(bev_image).copy()
 
         return bev_image
     
@@ -233,6 +243,9 @@ class Loaders():
             "image_03": calib["cam_to_cam"]["P_rect_03"].reshape(3, 4)[:, :3],
         }
 
+        # cam image original matrix
+        intrinsics["original_matrix"] = copy.deepcopy(intrinsics["matrix"])
+
         # cam image size
         intrinsics["size"] = {
             "image_00": (int(calib["cam_to_cam"]["S_rect_00"][0]), int(calib["cam_to_cam"]["S_rect_00"][1])),
@@ -240,6 +253,9 @@ class Loaders():
             "image_02": (int(calib["cam_to_cam"]["S_rect_02"][0]), int(calib["cam_to_cam"]["S_rect_02"][1])),
             "image_03": (int(calib["cam_to_cam"]["S_rect_03"][0]), int(calib["cam_to_cam"]["S_rect_03"][1])),
         }
+
+        # cam image original size
+        intrinsics["original_size"] = copy.deepcopy(intrinsics["size"])
         
         # extrinsics
         extrinsics = {}
@@ -251,18 +267,28 @@ class Loaders():
             "image_02": cam_to_cam02,
             "image_03": cam_to_cam03,
         }
+
+        # cam2cam original extrinsics
+        extrinsics["original_cam2cam"] = copy.deepcopy(extrinsics["cam2cam"])
         
         # lidar to cam extrinsics and intrinsics
         extrinsics["lidar2cam"] = {
+            "original": lidar2cam,
             "image_00": cam_to_cam00 @ lidar2cam,
             "image_01": cam_to_cam01 @ lidar2cam,
             "image_02": cam_to_cam02 @ lidar2cam,
             "image_03": cam_to_cam03 @ lidar2cam,
         }
 
+        # lidar2cam original extrinsics
+        extrinsics["original_lidar2cam"] = copy.deepcopy(extrinsics["lidar2cam"])
+
         # imu to velo extrinsics
         extrinsics["imu2velo"] = calib["imu_to_velo"]["R"].reshape(3, 3)
         extrinsics["imu2velo"] = np.concatenate([extrinsics["imu2velo"], calib["imu_to_velo"]["T"].reshape(3, 1)], axis=1)
         extrinsics["imu2velo"] = np.concatenate([extrinsics["imu2velo"], np.array([[0., 0., 0., 1.]])], axis=0)
+
+        # imu2velo original extrinsics
+        extrinsics["original_imu2velo"] = copy.deepcopy(extrinsics["imu2velo"])
 
         return intrinsics, extrinsics

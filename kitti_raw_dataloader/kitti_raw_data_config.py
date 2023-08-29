@@ -72,7 +72,7 @@ class KittiRawConfig(object):
                     "folder": "velodyne_points/data",
                     "format": ".bin",
                     "loader": "pointcloud_bev",
-                    "params": {"height": 1024, "width": 1024, "x_range": (-50, 50), "y_range": (-50, 50), "z_max": 5.0},
+                    "params": {"height": 512, "width": 512, "x_range": (-50, 50), "y_range": (-50, 50), "z_max": 5.0},
                 },
                 "lidar_depthmap": {
                     "load": True,
@@ -107,7 +107,7 @@ class KittiRawConfig(object):
         self.transforms["train"]: OrderedDict = OrderedDict()
         self.transforms["train"]["Crop"] = {"left": 0.0, "top": 0.0, "right": 0.0, "bottom": 0.0}
         self.transforms["train"]["RandomCrop"] = {"left": 0.0, "top": 0.0, "right": 0.0, "bottom": 0.0}
-        self.transforms["train"]["RandomFlip"] = {"flip_prob": 0.5}
+        self.transforms["train"]["RandomFlip"] = {"flip_prob": 0.5, "flip_lidar_in_cam_frame": True}
         self.transforms["train"]["Resize"] = {"height": 375, "width": 1242, "interpolation": "area"}
         self.transforms["train"]["Normalise"] = {"mean": [123.675, 116.28, 103.53], "std": [58.395, 57.12, 57.375], "to_rgb": False}
         self.transforms["train"]["ToTensor"] = {}

@@ -11,9 +11,40 @@ dataloaders = get_dataloaders()
 train_loader = dataloaders["train"]
 val_loader = dataloaders["val"]
 
-loader = val_loader
+loader = train_loader
+
+means = loader.dataset.cfg["transforms"]["train"]["Normalise"]["mean"]
+stds = loader.dataset.cfg["transforms"]["train"]["Normalise"]["std"]
+
+def load_pointcloud_depthmap(point_cloud: np.ndarray, lidar2cam: np.ndarray, size: np.ndarray, camera: str = "image_02") -> np.ndarray:
+
+    # project lidar points to image
+    point_cloud = point_cloud[:, :3].T
+    point_cloud = np.concatenate([point_cloud, np.ones([1, point_cloud.shape[1]])], axis=0)
+    img_points = lidar2cam @ point_cloud
+    depths = img_points[2]
+    img_points = img_points[:2] / img_points[2]
+    img_points = img_points.T.astype(np.int32)
+
+    # filter points outside image
+    img_size = size
+    mask = np.logical_and(img_points[:, 0] >= 0, img_points[:, 0] < img_size[0])
+    mask = np.logical_and(mask, img_points[:, 1] >= 0)
+    mask = np.logical_and(mask, img_points[:, 1] < img_size[1])
+    img_points = img_points[mask]
+    depths = depths[mask]
+
+    # save depthmap image
+    depthmap = np.zeros([img_size[1], img_size[0]])
+    depthmap[img_points[:, 1], img_points[:, 0]] = depths
+
+    return depthmap
 
 for i, batch in enumerate(loader):
+
+    # print all keys and their types and shapes
+    for key, value in batch.items():
+        print(key, type(value))
 
     # save binary image
     image = batch["lidar_bev"][0].cpu().squeeze().numpy() * 255
@@ -21,23 +52,13 @@ for i, batch in enumerate(loader):
     cv2.imwrite(f"temp/bev/{str(i).zfill(3)}_image.png", image)
 
     # save rgb image
-    image = batch["image_02"][0].cpu().numpy()
+    image = batch["image_02"][0].detach().permute(1, 2, 0).cpu().numpy()
+    image = (image * stds) + means
     cv2.imwrite(f"temp/image_02/{str(i).zfill(3)}_image.png", image)
 
     # save depthmap image
     depthmap = batch["lidar_depthmap"][0].cpu().squeeze().numpy()
     depthmap = depthmap * 255 / depthmap.max()
     cv2.imwrite(f"temp/depthmap/{str(i).zfill(3)}_image.png", depthmap)
-
-    # print odometry
-    odometry_dict = batch["odometry"]
-    for key, value in odometry_dict.items():
-        if isinstance(value, dict):
-            for key2, value2 in value.items():
-                print(key, key2, value2[0])
-        else:
-            print(key, value[0])
-
+    
     break
-    if i > 5:
-        break

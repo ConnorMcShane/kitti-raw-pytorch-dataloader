@@ -2,13 +2,7 @@
 
 from typing import Dict
 import os
-import copy
-
-import torch
 import numpy as np
-import pickle
-import json
-import cv2
 
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose
@@ -63,7 +57,7 @@ class KittiRawDatatset(Dataset):
 
         # initialise transforms
         for transform, params in self.cfg["transforms"][self.mode].items():
-            self.transforms_dict[transform] = TRANSFORMS[transform](params)
+            self.transforms_dict[transform] = TRANSFORMS[transform](params, self.cfg)
 
         # compose transforms
         self.transforms: Compose = Compose(self.transforms_dict.values())
