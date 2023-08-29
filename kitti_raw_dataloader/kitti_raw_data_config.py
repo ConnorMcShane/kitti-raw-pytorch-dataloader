@@ -74,9 +74,16 @@ class KittiRawConfig(object):
                     "loader": "pointcloud_bev",
                     "params": {"height": 1024, "width": 1024, "x_range": (-50, 50), "y_range": (-50, 50), "z_max": 5.0},
                 },
+                "lidar_depthmap": {
+                    "load": True,
+                    "folder": "velodyne_points/data",
+                    "format": ".bin",
+                    "loader": "pointcloud_depthmap",
+                    "params": {"camera": "image_02"},
+                }
             },
             "odometry": {
-                "otxs": {
+                "odometry": {
                     "load": True,
                     "folder": "oxts/data",
                     "format": ".txt",

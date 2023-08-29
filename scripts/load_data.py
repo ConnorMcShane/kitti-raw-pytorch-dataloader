@@ -15,8 +15,6 @@ loader = val_loader
 
 for i, batch in enumerate(loader):
 
-    print(batch["id"])
-
     # save binary image
     image = batch["lidar_bev"][0].cpu().squeeze().numpy() * 255
     image = image.astype(np.uint8)
@@ -26,5 +24,14 @@ for i, batch in enumerate(loader):
     image = batch["image_02"][0].cpu().numpy()
     cv2.imwrite(f"temp/image_02/{str(i).zfill(3)}_image.png", image)
 
+    # save depthmap image
+    depthmap = batch["lidar_depthmap"][0].cpu().squeeze().numpy()
+    depthmap = depthmap * 255 / depthmap.max()
+    cv2.imwrite(f"temp/depthmap/{str(i).zfill(3)}_image.png", depthmap)
+
+    # print odometry
+    print(batch["odometry"][0].cpu().numpy())
+
+    break
     if i > 5:
         break

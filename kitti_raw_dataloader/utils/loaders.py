@@ -21,8 +21,10 @@ class Loaders():
             "odometry": self.load_odometry,
             "pointcloud": self.load_pointcloud,
             "pointcloud_bev": self.load_pointcloud_bev,
-            "calib": self.load_calib,
+            "pointcloud_depthmap": self.load_pointcloud_depthmap,
+            "calibration": self.load_calibration,
         }
+        self.intrinsics, self.extrinsics = None, None
 
 
     @staticmethod
@@ -81,12 +83,6 @@ class Loaders():
         point_cloud = point_cloud[(point_cloud[:, 0] >= x_range[0]) & (point_cloud[:, 0] <= x_range[1])]
         point_cloud = point_cloud[(point_cloud[:, 1] >= y_range[0]) & (point_cloud[:, 1] <= y_range[1])]
 
-        # # create empty bev image
-        # point_cloud_bev = np.zeros((height, width), dtype=np.float32)
-
-        # point_cloud_bev = point_cloud_bev / z_max
-        # point_cloud_bev = np.clip(point_cloud_bev, 0, 1)
-
         # Calculate the step sizes for x and y
         x_step = (x_range[1] - x_range[0]) / width
         y_step = (y_range[1] - y_range[0]) / height
@@ -111,14 +107,121 @@ class Loaders():
         bev_image = np.clip(bev_image, 0, 1)
 
         return bev_image
+    
+
+    def load_pointcloud_depthmap(self, path: str, camera: str = "image_02") -> np.ndarray:
+        # load point cloud
+        point_cloud = self.load_pointcloud(path)
+
+        # reproject lidar points to image
+        lidar2cam = self.extrinsics["lidar2cam"][camera]
+
+        # project lidar points to image
+        point_cloud = point_cloud[:, :3].T
+        point_cloud = np.concatenate([point_cloud, np.ones([1, point_cloud.shape[1]])], axis=0)
+        img_points = lidar2cam @ point_cloud
+        depths = img_points[2]
+        img_points = img_points[:2] / img_points[2]
+        img_points = img_points.T.astype(np.int32)
+
+        # filter points outside image
+        img_size = self.intrinsics["size"][camera]
+        mask = np.logical_and(img_points[:, 0] >= 0, img_points[:, 0] < img_size[0])
+        mask = np.logical_and(mask, img_points[:, 1] >= 0)
+        mask = np.logical_and(mask, img_points[:, 1] < img_size[1])
+        img_points = img_points[mask]
+        depths = depths[mask]
+
+        # save depthmap image
+        depthmap = np.zeros([img_size[1], img_size[0]])
+        depthmap[img_points[:, 1], img_points[:, 0]] = depths
+
+        return depthmap
 
 
     @staticmethod
-    def load_calib(path: str) -> np.ndarray:
-        """Load calibration from path.
+    def load_calibration(path: str) -> np.ndarray:
+        """Load extrinsics from path.
         Args:
-            path (str): path to calibration file;
+            path (str): path to calibration files;
         Returns:
-            np.ndarray: calibration;
+            np.ndarray: extrinsics;
         """
-        return np.load(path)
+        # read in calibration files
+        calib =  {
+            "cam_to_cam":os.path.join(path, "calib_cam_to_cam.txt"),
+            "velo_to_cam":os.path.join(path, "calib_velo_to_cam.txt"),
+            "imu_to_velo":os.path.join(path, "calib_imu_to_velo.txt"),
+        }
+        for calib_name, calib_path in calib.items():
+            if not os.path.exists(calib_path):
+                raise FileNotFoundError(f"{calib_name} not found at {calib_path}")
+            with open(calib_path, "r") as f:
+                calib_data = f.readlines()
+            calib_data = {line.split(" ")[0].replace(":", ""):np.array(line.split(" ")[1:], dtype=np.float32) for line in calib_data[1:]}
+            calib[calib_name] = calib_data
+
+        # process camera intrinsics and extrinsics
+        cam_to_cam00 = calib["cam_to_cam"]["P_rect_00"].reshape([3, 4])
+        cam_to_cam01 = calib["cam_to_cam"]["P_rect_01"].reshape([3, 4])
+        cam_to_cam02 = calib["cam_to_cam"]["P_rect_02"].reshape([3, 4])
+        cam_to_cam03 = calib["cam_to_cam"]["P_rect_03"].reshape([3, 4])
+        cam_to_cam00 = np.concatenate([cam_to_cam00, np.array([[0., 0., 0., 1.]])], axis=0)
+        cam_to_cam01 = np.concatenate([cam_to_cam01, np.array([[0., 0., 0., 1.]])], axis=0)
+        cam_to_cam02 = np.concatenate([cam_to_cam02, np.array([[0., 0., 0., 1.]])], axis=0)
+        cam_to_cam03 = np.concatenate([cam_to_cam03, np.array([[0., 0., 0., 1.]])], axis=0)
+
+        # calculate lidar to camera extrinsics
+        rect = calib["cam_to_cam"]["R_rect_00"].reshape([3, 3])
+        rect_4x4 = np.eye(4, dtype=rect.dtype)
+        rect_4x4[:3, :3] = rect
+        lidar2cam = np.zeros([3, 4], dtype=rect.dtype)
+        lidar2cam[:3, :3] = calib["velo_to_cam"]["R"].reshape([3, 3])
+        lidar2cam[:, 3] = calib["velo_to_cam"]["T"].T
+        lidar2cam = np.concatenate([lidar2cam, np.array([[0., 0., 0., 1.]])], axis=0)
+        lidar2cam = rect_4x4 @ lidar2cam
+
+        # intrinsics
+        intrinsics = {}
+
+        # cam intrinsics only
+        intrinsics["matrix"] = {
+            "image_00": calib["cam_to_cam"]["P_rect_00"].reshape(3, 4)[:, :3],
+            "image_01": calib["cam_to_cam"]["P_rect_01"].reshape(3, 4)[:, :3],
+            "image_02": calib["cam_to_cam"]["P_rect_02"].reshape(3, 4)[:, :3],
+            "image_03": calib["cam_to_cam"]["P_rect_03"].reshape(3, 4)[:, :3],
+        }
+
+        # cam image size
+        intrinsics["size"] = {
+            "image_00": (int(calib["cam_to_cam"]["S_rect_00"][0]), int(calib["cam_to_cam"]["S_rect_00"][1])),
+            "image_01": (int(calib["cam_to_cam"]["S_rect_01"][0]), int(calib["cam_to_cam"]["S_rect_01"][1])),
+            "image_02": (int(calib["cam_to_cam"]["S_rect_02"][0]), int(calib["cam_to_cam"]["S_rect_02"][1])),
+            "image_03": (int(calib["cam_to_cam"]["S_rect_03"][0]), int(calib["cam_to_cam"]["S_rect_03"][1])),
+        }
+        
+        # extrinsics
+        extrinsics = {}
+
+        # cam extrinsics and intrinsics
+        extrinsics["cam2cam"] = {
+            "image_00": cam_to_cam00,
+            "image_01": cam_to_cam01,
+            "image_02": cam_to_cam02,
+            "image_03": cam_to_cam03,
+        }
+        
+        # lidar to cam extrinsics and intrinsics
+        extrinsics["lidar2cam"] = {
+            "image_00": cam_to_cam00 @ lidar2cam,
+            "image_01": cam_to_cam01 @ lidar2cam,
+            "image_02": cam_to_cam02 @ lidar2cam,
+            "image_03": cam_to_cam03 @ lidar2cam,
+        }
+
+        # imu to velo extrinsics
+        extrinsics["imu2velo"] = calib["imu_to_velo"]["R"].reshape(3, 3)
+        extrinsics["imu2velo"] = np.concatenate([extrinsics["imu2velo"], calib["imu_to_velo"]["T"].reshape(3, 1)], axis=1)
+        extrinsics["imu2velo"] = np.concatenate([extrinsics["imu2velo"], np.array([[0., 0., 0., 1.]])], axis=0)
+
+        return intrinsics, extrinsics

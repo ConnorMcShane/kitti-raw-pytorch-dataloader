@@ -88,6 +88,13 @@ class KittiRawDatatset(Dataset):
         sample = {}
         sample["id"] = sample_id
 
+        # load calibration
+        day_path = os.path.join(self.cfg["root"], sample_path.split("/")[0])
+        sample["intrinsics"], sample["extrinsics"] = self.loaders.load_dict["calibration"](day_path)
+        self.loaders.intrinsics = sample["intrinsics"]
+        self.loaders.extrinsics = sample["extrinsics"]
+
+        # load sensor data
         for sensor in self.cfg["input_sensors"]:
             for sensor_name, sensor_params in self.cfg["input_sensors"][sensor].items():
                 if sensor_params["load"]:
