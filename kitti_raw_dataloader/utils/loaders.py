@@ -49,7 +49,48 @@ class Loaders():
         Returns:
             np.ndarray: odometry;
         """
-        return np.loadtxt(path)
+        oxts_data = np.loadtxt(path, delimiter=" ", dtype=np.float32)
+        oxts_dict = dict(
+            position= dict(
+                lat=oxts_data[0],
+                lon=oxts_data[1],
+                alt=oxts_data[2],
+                roll=oxts_data[3],
+                pitch=oxts_data[4],
+                yaw=oxts_data[5],
+            ),
+            velocity= dict(
+                vn=oxts_data[6],
+                ve=oxts_data[7],
+                vf=oxts_data[8],
+                vl=oxts_data[9],
+                vu=oxts_data[10],
+            ),
+            acceleration= dict(
+                ax=oxts_data[11],
+                ay=oxts_data[12],
+                az=oxts_data[13],
+                af=oxts_data[14],
+                al=oxts_data[15],
+                au=oxts_data[16],
+            ),
+            angular_rate= dict(
+                wx=oxts_data[17],
+                wy=oxts_data[18],
+                wz=oxts_data[19],
+                wf=oxts_data[20],
+                wl=oxts_data[21],
+                wu=oxts_data[22],
+            ),
+            pos_accuracy=oxts_data[23],
+            vel_accuracy=oxts_data[24],
+            navstat=oxts_data[25],
+            numsats=oxts_data[26],
+            posmode=oxts_data[27],
+            velmode=oxts_data[28],
+            orimode=oxts_data[29],
+        )
+        return oxts_dict
 
 
     @staticmethod

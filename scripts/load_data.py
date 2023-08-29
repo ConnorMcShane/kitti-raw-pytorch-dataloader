@@ -30,7 +30,13 @@ for i, batch in enumerate(loader):
     cv2.imwrite(f"temp/depthmap/{str(i).zfill(3)}_image.png", depthmap)
 
     # print odometry
-    print(batch["odometry"][0].cpu().numpy())
+    odometry_dict = batch["odometry"]
+    for key, value in odometry_dict.items():
+        if isinstance(value, dict):
+            for key2, value2 in value.items():
+                print(key, key2, value2[0])
+        else:
+            print(key, value[0])
 
     break
     if i > 5:
