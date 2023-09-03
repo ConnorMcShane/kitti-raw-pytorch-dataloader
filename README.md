@@ -60,7 +60,7 @@ The data loader expects the data to be structured as follows:
 You can then use the example_data\create_split.py to create train, val and test splits with this command:
 
 ```bash
-python example_data\create_split.py --root .\example_data\kitti_raw --test_split 0.2 --val_split 0.3 --shuffle True
+python example_data/create_split.py --root ./example_data/kitti_raw --test_split 0.2 --val_split 0.3 --shuffle True
 ```
 
 ## Usage
