@@ -5,7 +5,7 @@ import sys
 import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from kitti_raw_dataloader.kitti_raw_dataloaders import get_dataloaders
+from kittiraw.kitti_raw_dataloaders import get_dataloaders
 
 dataloaders = get_dataloaders()
 train_loader = dataloaders["train"]

@@ -13,7 +13,14 @@ This dataloader is designed to be very easy to get started with and extend. It's
 ## Install
 1. Clone this repository
 2. Install requirements
-3. Install with pip: pip install -e .
+3. Install with pip: pip install .
+
+```bash
+git clone https://github.com/ConnorMcShane/kitti-raw-pytorch-dataloader.git
+cd kitti-raw-pytorch-dataloader
+pip install -r requirements.txt
+pip install .
+```
 
 ## Data
 The dataset is available at the official Kitti website: (http://www.cvlibs.net/datasets/kitti/raw_data.php). 
@@ -61,7 +68,7 @@ python example_data\create_split.py --root .\example_data\kitti_raw --test_split
 You can modify the configuration file kitti_raw_data_config.py to included the senors and transforms that you want.
 
 ```python
-from kitti_raw_dataloader.kitti_raw_dataloaders import get_dataloaders
+from kittiraw.kitti_raw_dataloaders import get_dataloaders
 
 dataloaders = get_dataloaders()
 train_loader = dataloaders["train"]
